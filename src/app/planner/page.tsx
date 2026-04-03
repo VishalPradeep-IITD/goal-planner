@@ -1,20 +1,29 @@
-import { redirect } from "next/navigation";
+"use client";
 
-export const dynamic = "force-dynamic";
-
-type PlannerRedirectPageProps = {
-  searchParams: Promise<{ id?: string | string[] }>;
-};
+import { Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 /** Old path; forwards to `/` so bookmarks and links keep working. */
-export default async function LegacyPlannerRedirect({
-  searchParams,
-}: PlannerRedirectPageProps) {
-  const params = await searchParams;
-  const raw = params.id;
-  const id = Array.isArray(raw) ? raw[0] : raw;
-  if (id) {
-    redirect(`/?id=${encodeURIComponent(id)}`);
-  }
-  redirect("/");
+function LegacyPlannerRedirectInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id) {
+      router.replace(`/?id=${encodeURIComponent(id)}`);
+    } else {
+      router.replace("/");
+    }
+  }, [router, searchParams]);
+
+  return null;
+}
+
+export default function LegacyPlannerRedirect() {
+  return (
+    <Suspense fallback={null}>
+      <LegacyPlannerRedirectInner />
+    </Suspense>
+  );
 }
