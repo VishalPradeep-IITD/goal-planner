@@ -39,6 +39,20 @@ Form-based planning, path comparison, and charts work without a key. Extraction 
 - `npm run start` — run production build
 - `npm run lint` — ESLint
 
+## Deploying to GitHub Pages (AI guidance)
+
+The workflow in `.github/workflows/nextjs.yml` produces a **static export** (`out/`). API routes are not shipped, so **AI guidance calls Gemini from the browser** using a key baked in at build time.
+
+1. In the repo, add a **Actions** secret named **`GEMINI_API_KEY`** (same key from [Google AI Studio](https://aistudio.google.com/apikey)). The workflow passes it as **`NEXT_PUBLIC_GEMINI_API_KEY`** during `next build` so the client bundle can call Gemini.
+2. Enable **GitHub Pages** (Settings → Pages) from **GitHub Actions**.
+3. **Security:** the key string is visible inside published JavaScript. Use **API key restrictions** in Google AI (e.g. limit by HTTP referrer to your `*.github.io` site) and treat the key as public.
+
+**Local `next dev`:** use **`GEMINI_API_KEY`** in `.env.local`; the app uses server **`/api/ai/explain`** (key stays on the server). You can instead set **`NEXT_PUBLIC_GEMINI_API_KEY`** to force the same browser path as production.
+
+**Full Node hosting (e.g. Vercel):** you can keep **`GEMINI_API_KEY`** only (no `NEXT_PUBLIC_*`); the server route is used when `NEXT_PUBLIC_GEMINI_API_KEY` is unset.
+
+Optional: if the UI is static but the API is hosted elsewhere, set **`NEXT_PUBLIC_API_BASE_URL`** to that origin and omit **`NEXT_PUBLIC_GEMINI_API_KEY`** so requests go to `/api/*` on that host.
+
 ## Project layout
 
 - `src/app/` — routes (`/`, `/planner`, `/plans`) and `api/ai/*` route handlers
@@ -65,6 +79,9 @@ See `src/lib/demo/sample-inputs.ts` or use the quick-fill chips on the planner p
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GEMINI_API_KEY` | For AI features | Google AI Studio API key |
+| `GEMINI_API_KEY` | For AI (dev / Node deploy) | Server-side key; use with `next dev` or hosts that run API routes |
 | `GEMINI_MODEL` | No | Defaults to `gemini-2.5-flash-lite` |
+| `NEXT_PUBLIC_GEMINI_API_KEY` | For AI on **static** export | Inlined at build time for browser Gemini (GitHub Pages CI sets this from the `GEMINI_API_KEY` secret) |
+| `NEXT_PUBLIC_GEMINI_MODEL` | No | Overrides model for browser Gemini |
 | `NEXT_PUBLIC_APP_URL` | No | Optional canonical URL |
+| `NEXT_PUBLIC_API_BASE_URL` | No | Origin of a deployment that serves `/api/*` when not using browser Gemini |

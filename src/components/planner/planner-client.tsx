@@ -54,6 +54,8 @@ import {
   getPlan,
   savePlan,
 } from "@/lib/storage/plans";
+import { explainPlanInBrowser } from "@/lib/ai/explain-client";
+import { apiUrl } from "@/lib/api-url";
 import { buttonVariants } from "@/lib/button-variants";
 import { cn } from "@/lib/utils";
 
@@ -300,7 +302,18 @@ export function PlannerClient() {
     setAiError(null);
 
     try {
-      const response = await fetch("/api/ai/explain", {
+      if (process.env.NEXT_PUBLIC_GEMINI_API_KEY?.trim()) {
+        const data = await explainPlanInBrowser({
+          goalDescription: locked.goalDescription,
+          scenarioLabel: getScenarioAssumptions(locked.scenario).label,
+          summary,
+        });
+        setAiSummary(data.summary);
+        setAiBullets(data.bullets ?? []);
+        return;
+      }
+
+      const response = await fetch(apiUrl("/api/ai/explain"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -312,7 +325,8 @@ export function PlannerClient() {
         }),
       });
 
-      const json = (await response.json()) as {
+      const raw = await response.text();
+      let json: {
         ok: boolean;
         error?: string;
         data?: {
@@ -320,6 +334,16 @@ export function PlannerClient() {
           bullets?: string[];
         };
       };
+      try {
+        json = JSON.parse(raw) as typeof json;
+      } catch {
+        const looksLikeHtml = raw.trimStart().startsWith("<");
+        throw new Error(
+          looksLikeHtml
+            ? "AI guidance on static hosting needs NEXT_PUBLIC_GEMINI_API_KEY at build time (see README), or run the app with next dev and GEMINI_API_KEY for API routes."
+            : "Could not parse AI guidance response."
+        );
+      }
 
       if (!response.ok || !json.ok || !json.data?.summary) {
         throw new Error(json.error ?? "Could not generate AI guidance.");
@@ -346,14 +370,12 @@ export function PlannerClient() {
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <div className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(242,248,246,0.98))] p-6 shadow-sm sm:p-8">
         <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(24,110,99,0.14),transparent_62%)] lg:block" />
-        <div className="relative max-w-3xl space-y-4">
+        <div className="relative space-y-4">
+          <div className="space-y-4  max-w-3xl relative">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Badge variant="outline" className="border-primary/20 bg-white/70">
               Simple goal to SIP planner
             </Badge>
-            <p className="max-w-[16rem] text-right text-xs leading-snug text-muted-foreground">
-              A project by Vishal P, IIT Delhi
-            </p>
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-5xl">
             Enter the goal. Pick a suggestion. Adjust if needed.
@@ -363,17 +385,26 @@ export function PlannerClient() {
             when you need it, and how much you already have. The app then
             suggests SIP plans and lets you tweak one without clutter.
           </p>
-          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-            <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-foreground/8">
-              1. Goal
-            </span>
-            <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-foreground/8">
-              2. Suggestions
-            </span>
-            <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-foreground/8">
-              3. Tweak and save
-            </span>
           </div>
+          <div className="flex justify-between">
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+              <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-foreground/8">
+                1. Goal
+              </span>
+              <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-foreground/8">
+                2. Suggestions
+              </span>
+              <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-foreground/8">
+                3. Tweak and save
+              </span>
+            </div>
+            <Badge variant="outline" className="border-primary bg-primary/5 py-3 px-3">
+            <span className="text-sm font-semibold leading-snug text-foreground">
+            A project by Vishal P, IIT Delhi
+            </span>
+            </Badge>
+          </div>
+         
         </div>
       </div>
 
@@ -402,7 +433,7 @@ export function PlannerClient() {
                 <Input
                   id="goalDescription"
                   {...form.register("goalDescription")}
-                  placeholder="Example: Child education fund"
+                  placeholder="Example: Car Fund"
                 />
                 {form.formState.errors.goalDescription ? (
                   <p className="text-sm text-destructive">

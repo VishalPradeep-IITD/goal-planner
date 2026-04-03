@@ -39,8 +39,8 @@ export const goalFormSchema = z.object({
 export type GoalFormValues = z.infer<typeof goalFormSchema>;
 
 export const defaultGoalFormValues: GoalFormValues = {
-  goalDescription: "Child education fund",
-  goalAmountTodayInr: 25_00_000,
+  goalDescription: "Car Fund",
+  goalAmountTodayInr: 10_00_000,
   horizonYears: 8,
   currentLumpSumInr: 2_00_000,
   monthlySipInr: 0,
